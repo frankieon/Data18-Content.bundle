@@ -16,6 +16,22 @@ def Start():
   HTTP.SetHeader('User-agent', 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.2; Trident/4.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729; .NET CLR 3.0.30729; Media Center PC 6.0)')
 
 
+def xpath_prepare(xpath, search):
+  return xpath.replace("$u", search.upper()).replace("$l", search.lower()).replace("$s", search.lower())
+
+
+def find_option_value(searchURL, search_results, search):
+  xp = xpath_prepare('//select//Option[text()[contains(translate(., "$u", "$l"), "$s")]]//@value', search)
+  Log('xPath: ' + xp)
+  try:
+    searchURL = search_results.xpath(xp)[0]
+  except:
+    xp = xpath_prepare('//select//option[text()[contains(translate(., "$u", "$l"), "$s")]]//@value', search)
+    Log('xPath: ' + xp)
+    searchURL = search_results.xpath(xp)[0]
+  return searchURL
+
+
 def search_na(results, media_title, year, lang):
   """
   Since N.A. scenes are not appearing in the search we need to do a bit of trickery to get them.
@@ -37,24 +53,19 @@ def search_na(results, media_title, year, lang):
     searchURL = EXC_BASEURL + 'dev/' + query_actor
     Log('Search URL: ' + searchURL)
     search_results = HTML.ElementFromURL(searchURL)
-  
-  xp = '''//select//Option[text()[contains(translate(., "%s", "%s"), "%s")]]//@value''' % (na_url_site.upper(), na_url_site.lower(), na_url_site.lower())
-  Log('xPath: ' + xp)
+
   try:
+    searchURL = find_option_value(searchURL, search_results, search)
+  except:
     try:
-      searchURL = search_results.xpath(xp)[0]
+      searchURL = find_option_value(searchURL, search_results, re.sub(r'[\'\"]', '', search))
     except:
-      xp = '''//select//option[text()[contains(translate(., "%s", "%s"), "%s")]]//@value''' % (na_url_site.upper(), na_url_site.lower(), na_url_site.lower())
+      search_results = HTML.ElementFromURL(searchURL + '/sites/')
+      xp = xpath_prepare('//a[text()[contains(translate(., "$u", "$l"), "$s")]]//@href', search)
       Log('xPath: ' + xp)
       searchURL = search_results.xpath(xp)[0]
-  except:
-    search_results = HTML.ElementFromURL(searchURL + '/sites/')
-    xp = '''//a[text()[contains(translate(., "%s", "%s"), "%s")]]//@href''' % (na_url_site.upper(), na_url_site.lower(), na_url_site.lower())
-    Log('xPath: ' + xp)
-    searchURL = search_results.xpath(xp)[0]
-    
-  #Log('Search URL: ' + searchURL)
-  search_results = HTML.ElementFromURL(searchURL)    	
+
+  search_results = HTML.ElementFromURL(searchURL)
 
 
   #searchURL = EXC_BASEURL + query_actor + '/sites/' + na_url_part + '.html'
@@ -63,7 +74,7 @@ def search_na(results, media_title, year, lang):
     #search_results = HTML.ElementFromURL(searchURL)
   #except:
     #searchURL = EXC_BASEURL +'dev/' + query_actor + '/sites/' + na_url_part + '.html'
-    #search_results = HTML.ElementFromURL(searchURL)    	
+    #search_results = HTML.ElementFromURL(searchURL)
   count = 0
   for movie in search_results.xpath('//div[@class="bscene2 genmed"]//p[@class="line1"]//a[@class="gen11 bold"]'):
     movie_HREF = movie.get("href").strip()
@@ -72,7 +83,7 @@ def search_na(results, media_title, year, lang):
     Log('New title: ' + current_name)
     current_ID = movie.get('href').split('/',4)[4]
     Log('New ID: ' + current_ID)
-    
+
     try:
       movieResults = HTML.ElementFromURL(movie_HREF)
       curyear = movieResults.xpath('//p[contains(text(),"Date")]//a')[0].get('href')
@@ -111,7 +122,7 @@ def search_na(results, media_title, year, lang):
       results.Append(MetadataSearchResult(id = current_ID, name = current_name, score = score, lang = lang))
     count += 1
   results.Sort('score', descending=True)
-  
+
 
 class EXCAgent(Agent.Movies):
   name = 'Data18-Content'
@@ -124,8 +135,11 @@ class EXCAgent(Agent.Movies):
     Log('Data18 Version : ' + VERSION_NO)
     Log('**************SEARCH****************')
     title = media.name
+    content_id = False
+
     if media.name.isdigit():
         Log('Media.name is numeric')
+        content_id = True
         contentURL = EXC_MOVIE_INFO % media.name
         html = HTML.ElementFromURL(contentURL)
         title = html.xpath('//div/h1/text()')[0]
@@ -140,15 +154,14 @@ class EXCAgent(Agent.Movies):
       Log('Searching for Year: ' + year)
 
     Log('Searching for Title: ' + title)
-
-    if " in " in title.lower():
+    if " in " in title.lower() and not content_id:
       search_na(results, title, year, lang)
-      
-        
+
+
     if len(results) == 0:
       #query = String.URLEncode(String.StripDiacritics(title.replace('-','')))
       query = String.URLEncode(String.StripDiacritics(title))
-      
+
       searchUrl = EXC_SEARCH_MOVIES % query
       Log('search url: ' + searchUrl)
       searchResults = HTML.ElementFromURL(searchUrl)
@@ -156,7 +169,7 @@ class EXCAgent(Agent.Movies):
       count = 0
       for movie in searchResults.xpath('//div[@class="gen"]//p[@class="gen12"]//a[contains(@href,"content")]'):
         movieHREF = movie.get("href").strip()
-        Log('MovieHREF: ' + movieHREF)     
+        Log('MovieHREF: ' + movieHREF)
         curName = movie.text_content().strip()
         Log('newTitle: ' + curName)
         curID = movie.get('href').split('/',4)[4]
@@ -200,9 +213,9 @@ class EXCAgent(Agent.Movies):
         count += 1
       results.Sort('score', descending=True)
 
-    
-    
-    
+
+
+
 
   def update(self, metadata, media, lang):
     Log('Data18 Version : ' + VERSION_NO)
