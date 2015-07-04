@@ -55,16 +55,15 @@ def search_na(results, media_title, year, lang):
     search_results = HTML.ElementFromURL(searchURL)
 
   try:
-    searchURL = find_option_value(searchURL, search_results, search)
+    searchURL = find_option_value(searchURL, search_results, na_url_site)
   except:
     try:
-      searchURL = find_option_value(searchURL, search_results, re.sub(r'[\'\"]', '', search))
+      searchURL = find_option_value(searchURL, search_results, re.sub(r'[\'\"]', '', na_url_site))
     except:
       search_results = HTML.ElementFromURL(searchURL + '/sites/')
-      xp = xpath_prepare('//a[text()[contains(translate(., "$u", "$l"), "$s")]]//@href', search)
+      xp = xpath_prepare('//a[text()[contains(translate(., "$u", "$l"), "$s")]]//@href', na_url_site)
       Log('xPath: ' + xp)
       searchURL = search_results.xpath(xp)[0]
-
   search_results = HTML.ElementFromURL(searchURL)
 
 
@@ -154,9 +153,6 @@ class EXCAgent(Agent.Movies):
       Log('Searching for Year: ' + year)
 
     Log('Searching for Title: ' + title)
-    if " in " in title.lower() and not content_id:
-      search_na(results, title, year, lang)
-
 
     if len(results) == 0:
       #query = String.URLEncode(String.StripDiacritics(title.replace('-','')))
@@ -211,6 +207,13 @@ class EXCAgent(Agent.Movies):
           #Log('    URL: ' + movieHREF)
           results.Append(MetadataSearchResult(id = curID, name = curName, score = score, lang = lang))
         count += 1
+
+      if " in " in title.lower() and not content_id:
+        try:
+          search_na(results, title, year, lang)
+        except (IndexError):
+          pass
+
       results.Sort('score', descending=True)
 
 
