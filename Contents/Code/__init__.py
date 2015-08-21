@@ -9,132 +9,190 @@ VERSION_NO = '1.2015.03.28.2'
 EXC_BASEURL = 'http://www.data18.com/'
 EXC_SEARCH_MOVIES = EXC_BASEURL + 'search/?k=%s&t=0'
 EXC_MOVIE_INFO = EXC_BASEURL + 'content/%s'
-XP_SCENE_LINK = '//div[contains(@class,"bscene")]//span//a[contains(@href,"content")]'
-
+USER_AGENT = 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.2;\ Trident/4.0;\
+                 SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729;\
+                 .NET CLR 3.0.30729; Media Center PC 6.0)'
 titleFormats = r'DVD|Blu-Ray|BR|Combo|Pack'
 
+XPATHS = {
+    'scene-container': '//div[contains(@class,"bscene")]',
+    'scene-link': '//span//a[contains(@href,"content")]',
+    'scene-site': '//p[contains(text(), "Site")]]',
+    'scene-network': '//p[contains(text(), "Network")]]',
+    'scene-cast': '//p[contains(text(), "Cast")]]',
+    'release-date': '//p[text()[contains(\
+                        translate(.,"relasdt","RELASDT"),\
+                        "RELEASE DATE")]]//a',
+    'release-date2': '//*[b[contains(text(),"Scene Information")]]\
+                        //a[@title="Show me all updates from this date"]',
+    'site-link': '//select//Option[text()[contains(\
+                        translate(., "$u", "$l"), "$s")\
+                        ]]//@value',
+    'actor-site-link': '//a[text()[contains(\
+                            translate(., "$u", "$l"), "$s")\
+                            ]]//@href'
+}
+
+
 def Start():
-  HTTP.CacheTime = CACHE_1DAY
-  HTTP.SetHeader('User-agent', 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.2; Trident/4.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729; .NET CLR 3.0.30729; Media Center PC 6.0)')
+    HTTP.CacheTime = CACHE_1DAY
+    HTTP.SetHeader('User-agent', USER_AGENT)
+
+
+def parse_content_date(date):
+    try:
+        return Datetime.ParseDate(date).date()
+    except:
+        return datetime.strptime(date, '%B %d, %Y').date()
+
 
 def parse_document_date(html):
-  try:
+    date_found = None
     try:
-      curyear = html.xpath('//p[text()[contains(translate(.,"relasdt","RELASDT"),"RELEASE DATE")]]//a')[0].get('href')
-      curyear_group = re.search(r'(\d{8})',curyear)
-      curdate = curyear_group.group(0)
-      curdate = Datetime.ParseDate(curdate).date()
+        date_found = html.xpath(XPATHS['release-date'])[0].get('href')
+        date_found_group = re.search(r'(\d{8})', date_found)
+        date_found = date_found_group.group(0)
     except:
-      date = html.xpath('//*[b[contains(text(),"Scene Information")]]//a[@title="Show me all updates from this date"]')[0].text_content()
-      curdate = datetime.strptime(date, '%B %d, %Y').date()
-  except:
-    curdate = None
-  return curdate
+        date_found = html.xpath(XPATHS['release-date2'])[0].text_content()
+    return parse_content_date(date_found)
 
 
 def xpath_prepare(xpath, search):
-  return xpath.replace("$u", search.upper()).replace("$l", search.lower()).replace("$s", search.lower())
+    xpath = xpath.replace("$u", search.upper())
+    xpath = xpath.replace("$l", search.lower())
+    xpath = xpath.replace("$s", search.lower())
+    return xpath
 
 
-def find_option_value(searchURL, search_results, search):
-  xp = xpath_prepare('//select//Option[text()[contains(translate(., "$u", "$l"), "$s")]]//@value', search)
-  Log('xPath: ' + xp)
-  try:
-    searchURL = search_results.xpath(xp)[0]
-  except:
-    xp = xpath_prepare('//select//option[text()[contains(translate(., "$u", "$l"), "$s")]]//@value', search)
+def find_site_url(siteURL, search_results, search):
+    xp = xpath_prepare(XPATHS['site-link'], search)
+
     Log('xPath: ' + xp)
-    searchURL = search_results.xpath(xp)[0]
-  return searchURL
-
-
-def search_na(results, media_title, year, lang):
-  """
-  Since N.A. scenes are not appearing in the search we need to do a bit of trickery to get them.
-  """
-  Log('Alternative search for N.A. websites')
-  actors = media_title.split(' in ')[0].split(',')
-  actors_url_parts = media_title.split(' in ')[0].lower().replace(' ', '_').split(',')
-  na_url_site = media_title.split(' in ',1)[1]
-  Log('Search URL: ' + na_url_site)
-
-  # Take the first actor and the website name to search
-  query_actor = String.URLEncode(String.StripDiacritics(actors_url_parts[0].replace('-','')))
-  searchURL = EXC_BASEURL + query_actor
-  Log('Search URL: ' + searchURL)
-
-  try:
-    search_results = HTML.ElementFromURL(searchURL)
-  except:
-    searchURL = EXC_BASEURL + 'dev/' + query_actor
-    Log('Search URL: ' + searchURL)
-    search_results = HTML.ElementFromURL(searchURL)
-
-  try:
-    searchURL = find_option_value(searchURL, search_results, na_url_site)
-  except:
     try:
-      searchURL = find_option_value(searchURL, search_results, re.sub(r'[\'\"]', '', na_url_site))
+        siteURL = search_results.xpath(xp)[0]
     except:
-      search_results = HTML.ElementFromURL(searchURL + '/sites/')
-      xp = xpath_prepare('//a[text()[contains(translate(., "$u", "$l"), "$s")]]//@href', na_url_site)
-      Log('xPath: ' + xp)
-      searchURL = search_results.xpath(xp)[0]
+        try:
+            # If we failed, let's try with all elements lowercased
+            xp = xpath_prepare(XPATHS['site-link'].lower(), search)
+            Log('xPath: ' + xp)
+            siteURL = search_results.xpath(xp)[0]
+        except:
+            search = re.sub(r'[\'\"]', '', search)
+            xp = xpath_prepare(XPATHS['site-link'], search)
+            # Let's try another iteration with less special characters
+            try:
+                siteURL = search_results.xpath(xp)[0]
+            except:
+                # If we failed, let's try with all elements lowercased
+                xp = xpath_prepare(XPATHS['site-link'].lower(), search)
+                Log('xPath: ' + xp)
+                siteURL = search_results.xpath(xp)[0]
+    return siteURL
 
-  search_results = HTML.ElementFromURL(searchURL)
 
+def search_actor_in_site(results, media_title, year, lang):
+    """
+    Since Actor in Site scenes are not appearing in the search we need to
+    find the actor's page, then find the site link, in order to find the actual
+    content page.
+    """
 
-  #searchURL = EXC_BASEURL + query_actor + '/sites/' + na_url_part + '.html'
-  Log('Search URL: ' + searchURL)
-  #try:
-    #search_results = HTML.ElementFromURL(searchURL)
-  #except:
-    #searchURL = EXC_BASEURL +'dev/' + query_actor + '/sites/' + na_url_part + '.html'
-    #search_results = HTML.ElementFromURL(searchURL)
-  count = 0
-  for movie in search_results.xpath(XP_SCENE_LINK):
-    movie_HREF = movie.get("href").strip()
-    Log('Movie HREF: ' + movie_HREF)
-    current_name = movie.text_content().strip()
-    Log('New title: ' + current_name)
-    current_ID = movie.get('href').split('/',4)[4]
-    Log('New ID: ' + current_ID)
+    Log('Alternative search for Actor in Site')
+
+    # Should be used at a later point of the future of this parser
+    # actors = media_title.split(' in ')[0].split(',')
+    actors_url_parts = media_title.split(' in ')[0].lower()
+    actors_url_parts = actors_url_parts.replace(' ', '_').split(',')
+    site_name = media_title.split(' in ', 1)[1]
+    Log('Search URL: ' + site_name)
+
+    # Take the first actor and the website name to search
+    query_actor = actors_url_parts[0].replace('-', '')
+    query_actor = String.StripDiacritics(query_actor)
+    query_actor = String.URLEncode(query_actor)
+    searchURL = EXC_BASEURL + query_actor
+    Log('Search URL: ' + searchURL)
 
     try:
-      movieResults = HTML.ElementFromURL(movie_HREF)
-      curdate = parse_document_date(movieResults)
-      if curdate is None:
-        Log('Date: No date found')
-        score = 100 - Util.LevenshteinDistance(media_title.lower(), current_name.lower())
-        curyear = ''
-        curdate = ''
-      else:
-        curyear = str(curdate.year)
-        curmonth = str(curdate.month)
-        curday = str(curdate.day)
-        curdate = str(curdate)
-        Log('Found Date = ' + curdate)
-        score = 100 - Util.LevenshteinDistance(media_title.lower(), current_name.lower()) - Util.LevenshteinDistance(year, curyear)
-        Log('It Worked ************************************************************')
-    except (IndexError):
-      score = 100 - Util.LevenshteinDistance(media_title.lower(), current_name.lower())
-      curyear = ''
-      curdate = ''
-      Log('Date: No date found (Exception)')
-    if score >= 45:
-      if current_name.count(', The'):
-        current_name = 'The ' + current_name.replace(', The','',1)
-      if curdate:
-        current_name = current_name + ' [' + curdate + ']'
+        search_results = HTML.ElementFromURL(searchURL)
+    except:
+        # These are actors that do not have their page flushed out
+        searchURL = EXC_BASEURL + 'dev/' + query_actor
+        Log('Search URL: ' + searchURL)
+        search_results = HTML.ElementFromURL(searchURL)
 
-      Log('Found:')
-      Log('    Date: ' + curdate)
-      Log('    ID: ' + current_ID)
-      Log('    Title: ' + current_name)
-      Log('    URL: ' + movie_HREF)
-      results.Append(MetadataSearchResult(id = current_ID, name = current_name, score = score, lang = lang))
-    count += 1
-  results.Sort('score', descending=True)
+    try:
+        searchURL = find_site_url(searchURL, search_results, site_name)
+    except:
+        search_results = HTML.ElementFromURL(searchURL + '/sites/')
+        xp = xpath_prepare(XPATHS['actor-site-link'], site_name)
+        Log('xPath: ' + xp)
+        searchURL = search_results.xpath(xp)[0]
+
+    search_results = HTML.ElementFromURL(searchURL)
+
+
+    #searchURL = EXC_BASEURL + query_actor + '/sites/' + na_url_part + '.html'
+    Log('Search URL: ' + searchURL)
+    #try:
+        #search_results = HTML.ElementFromURL(searchURL)
+    #except:
+        #searchURL = EXC_BASEURL +'dev/' + query_actor + '/sites/' + na_url_part + '.html'
+        #search_results = HTML.ElementFromURL(searchURL)
+    count = 0
+    title_lowercase = media_title.lower()
+    for movie in search_results.xpath(XPATHS['scene-container']):
+
+        title_link = movie.xpath(XPATHS['scene-link'])[0]
+        movie_HREF = title_link.get("href").strip()
+        Log('Movie HREF: ' + movie_HREF)
+
+        current_name = title_link.text_content().strip()
+        name_lowercase = current_name.lower()
+        Log('New title: ' + current_name + ' ' + name_lowercase)
+
+        current_ID = title_link.get('href').split('/', 4)[4]
+        Log('New ID: ' + current_ID)
+
+        name_distance_score = Util.LevenshteinDistance(title_lowercase,
+                                                       name_lowercase)
+        Log('Name Matching Distance', name_distance_score)
+
+        # Start the score
+        score = 100 - name_distance_score
+
+        try:
+            current_date = movie.xpath('/text()[1]')
+            current_date = parse_content_date(current_date)
+            Log('New Date: ' + str(current_date))
+        except:
+            try:
+                movieResults = HTML.ElementFromURL(movie_HREF)
+                current_date = parse_document_date(movieResults)
+                Log('Found Date = ' + str(current_date))
+            except (IndexError):
+                Log('Date: No date found (Exception)')
+
+        try:
+            score = score - Util.LevenshteinDistance(year, current_date.year)
+        except:
+            pass
+
+        if score >= 45:
+            if current_name.count(', The'):
+                current_name = 'The ' + current_name.replace(', The', '', 1)
+            if current_date:
+                current_name = current_name + ' [' + current_date + ']'
+
+            Log('Found:')
+            Log('    Date: ' + current_date)
+            Log('    ID: ' + current_ID)
+            Log('    Title: ' + current_name)
+            Log('    URL: ' + movie_HREF)
+            result = MetadataSearchResult(id=current_ID, name=current_name, score=score, lang=lang)
+            results.Append(result)
+        count += 1
+    results.Sort('score', descending=True)
 
 
 class EXCAgent(Agent.Movies):
@@ -221,7 +279,7 @@ class EXCAgent(Agent.Movies):
 
       if " in " in title.lower() and not content_id:
         try:
-          search_na(results, title, year, lang)
+          search_actor_in_site(results, title, year, lang)
         except (IndexError):
           pass
 
