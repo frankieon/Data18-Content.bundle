@@ -331,184 +331,202 @@ class EXCAgent(Agent.Movies):
             metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
             i += 1
             Log('Poster - Photoset - Sequence Updated')
-        except: pass
+        except:
+            pass
 
-    # Get First Photo Set Pic if available (when src is used instead of href)
-    try:
-      photoSetIndex = 0
-      posterimg = html.xpath('//img[contains(@alt,"image")]')[photoSetIndex]
-      posterUrl = posterimg.get('src').strip()
-      Log('imageUrl: ' + posterUrl)
-      metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
-      i += 1
-      #Random PhotoSet image incase first image isn't desired
-      photoSetIndex = random.randint(1,len(html.xpath('//img[contains(@alt,"image")]'))-1)
-      posterimg = html.xpath('//img[contains(@alt,"image")]')[photoSetIndex]
-      posterUrl = posterimg.get('src').strip()
-      Log('imageUrl: ' + posterUrl)
-      metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
-      i += 1
-      Log('Poster - Photoset - Sequence Updated')
-    except: pass
+        # Get First Photo Set Pic if available (when src is used instead of href)
+        try:
+            photoSetIndex = 0
+            posterimg = html.xpath('//img[contains(@alt,"image")]')[photoSetIndex]
+            posterUrl = posterimg.get('src').strip()
+            Log('imageUrl: ' + posterUrl)
+            metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
+            i += 1
+            #Random PhotoSet image incase first image isn't desired
+            photoSetIndex = random.randint(1,len(html.xpath('//img[contains(@alt,"image")]'))-1)
+            posterimg = html.xpath('//img[contains(@alt,"image")]')[photoSetIndex]
+            posterUrl = posterimg.get('src').strip()
+            Log('imageUrl: ' + posterUrl)
+            metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
+            i += 1
+            Log('Poster - Photoset - Sequence Updated')
+        except:
+            pass
 
-    # Get alternate Poster - Video
-    try:
-      posterimg = html.xpath('//img[@alt="Play this Video"]')[0]
-      posterUrl = posterimg.get('src').strip()
-      Log('Video Postetr Url: ' + posterUrl)
-      metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
-      Log('Video Poster Sequence Updated')
-    except: pass
+        # Get alternate Poster - Video
+        try:
+            posterimg = html.xpath('//img[@alt="Play this Video"]')[0]
+            posterUrl = posterimg.get('src').strip()
+            Log('Video Postetr Url: ' + posterUrl)
+            metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
+            Log('Video Poster Sequence Updated')
+        except:
+            pass
 
-    # Get Art
-    # Get Art from "Play this Video"
-    try:
-      i = 1
-      posterimg = html.xpath('//img[@alt="Play this Video"]')[0]
-      posterUrl = posterimg.get('src').strip()
-      Log('ArtUrl: ' + posterUrl)
-      metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content,  sort_order = i)
-      i += 1
-      Log('Art Sequence Updated')
-    except: pass
-    #Second try at "Play this Video" (Embedded html #document)
-    try:
-      imageURL =  html.xpath('//*//iframe[contains(@src,"player.php")][1]')[0].get('src')
-      imagehtml = HTML.ElementFromURL(imageURL)
-      posterimg = imagehtml.xpath('//img[@alt="Play this Video"]')[0]
-      posterUrl = posterimg.get('src').strip()
-      Log('imageUrl: ' + posterUrl)
-      metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
-      i += 1
-      Log('Art -Embedded Video- Sequence Updated')
-    except: pass
+        # Get Art
+        # Get Art from "Play this Video"
+        try:
+            i = 1
+            posterimg = html.xpath('//img[@alt="Play this Video"]')[0]
+            posterUrl = posterimg.get('src').strip()
+            Log('ArtUrl: ' + posterUrl)
+            metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content,  sort_order = i)
+            i += 1
+            Log('Art Sequence Updated')
+        except:
+            pass
+        #Second try at "Play this Video" (Embedded html #document)
+        try:
+            imageURL =  html.xpath('//*//iframe[contains(@src,"player.php")][1]')[0].get('src')
+            imagehtml = HTML.ElementFromURL(imageURL)
+            posterimg = imagehtml.xpath('//img[@alt="Play this Video"]')[0]
+            posterUrl = posterimg.get('src').strip()
+            Log('imageUrl: ' + posterUrl)
+            metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
+            i += 1
+            Log('Art -Embedded Video- Sequence Updated')
+        except:
+            pass
 
- # Get First Photo Set Pic if available
-    try:
-      photoSetIndex = 0
-      imageURL =  html.xpath('//img[contains(@alt,"image")]/..')[photoSetIndex].get('href')
-      imagehtml = HTML.ElementFromURL(imageURL)
-      posterimg = imagehtml.xpath('//img[@alt= "image"]')[0]
-      posterUrl = posterimg.get('src').strip()
-      Log('imageUrl: ' + posterUrl)
-      metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
-      i += 1
-      #Random PhotoSet image incase first image isn't desired
-      photoSetIndex = random.randint(1,len(html.xpath('//img[contains(@alt,"image")]/..'))-1)
-      imageURL =  html.xpath('//img[contains(@alt,"image")]/..')[photoSetIndex].get('href')
-      imagehtml = HTML.ElementFromURL(imageURL)
-      posterimg = imagehtml.xpath('//img[@alt= "image"]')[0]
-      posterUrl = posterimg.get('src').strip()
-      Log('imageUrl: ' + posterUrl)
-      metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
-      i += 1
-      Log('Art - Photoset - Sequence Updated')
-    except: pass
+        # Get First Photo Set Pic if available
+        try:
+            photoSetIndex = 0
+            imageURL =  html.xpath('//img[contains(@alt,"image")]/..')[photoSetIndex].get('href')
+            imagehtml = HTML.ElementFromURL(imageURL)
+            posterimg = imagehtml.xpath('//img[@alt= "image"]')[0]
+            posterUrl = posterimg.get('src').strip()
+            Log('imageUrl: ' + posterUrl)
+            metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
+            i += 1
+            #Random PhotoSet image incase first image isn't desired
+            photoSetIndex = random.randint(1,len(html.xpath('//img[contains(@alt,"image")]/..'))-1)
+            imageURL =  html.xpath('//img[contains(@alt,"image")]/..')[photoSetIndex].get('href')
+            imagehtml = HTML.ElementFromURL(imageURL)
+            posterimg = imagehtml.xpath('//img[@alt= "image"]')[0]
+            posterUrl = posterimg.get('src').strip()
+            Log('imageUrl: ' + posterUrl)
+            metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
+            i += 1
+            Log('Art - Photoset - Sequence Updated')
+        except:
+            pass
 
-    # Get First Photo Set Pic if available (when src is used instead of href)
-    try:
-      photoSetIndex = 0
-      posterimg = html.xpath('//img[contains(@alt,"image")]')[photoSetIndex]
-      posterUrl = posterimg.get('src').strip()
-      Log('imageUrl: ' + posterUrl)
-      metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
-      i += 1
-      #Random PhotoSet image incase first image isn't desired
-      photoSetIndex = random.randint(1,len(html.xpath('//img[contains(@alt,"image")]'))-1)
-      posterimg = html.xpath('//img[contains(@alt,"image")]')[photoSetIndex]
-      posterUrl = posterimg.get('src').strip()
-      Log('imageUrl: ' + posterUrl)
-      metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
-      i += 1
-      Log('Poster - Photoset - Sequence Updated')
-    except: pass
+        # Get First Photo Set Pic if available (when src is used instead of href)
+        try:
+            photoSetIndex = 0
+            posterimg = html.xpath('//img[contains(@alt,"image")]')[photoSetIndex]
+            posterUrl = posterimg.get('src').strip()
+            Log('imageUrl: ' + posterUrl)
+            metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
+            i += 1
+            #Random PhotoSet image incase first image isn't desired
+            photoSetIndex = random.randint(1,len(html.xpath('//img[contains(@alt,"image")]'))-1)
+            posterimg = html.xpath('//img[contains(@alt,"image")]')[photoSetIndex]
+            posterUrl = posterimg.get('src').strip()
+            Log('imageUrl: ' + posterUrl)
+            metadata.art[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
+            i += 1
+            Log('Poster - Photoset - Sequence Updated')
+        except:
+            pass
 
-    # Genre.
-    try:
-      metadata.genres.clear()
-      genres = html.xpath('//*[b[contains(text(),"Categories")]]//a[contains(@href, ".html")]')
-      if len(genres) > 0:
-        for genreLink in genres:
-          genreName = genreLink.text_content().strip('\n')
-          if len(genreName) > 0 and re.match(r'View Complete List', genreName) is None:
-            if re.match(r'Filter content by multiple tags', genreName) is None:
-              metadata.genres.add(genreName)
-      Log('Genre Sequence Updated')
-    except: pass
+        # Genre.
+        try:
+            metadata.genres.clear()
+            genres = html.xpath('//*[b[contains(text(),"Categories")]]//a[contains(@href, ".html")]')
+            if len(genres) > 0:
+                for genreLink in genres:
+                    genreName = genreLink.text_content().strip('\n')
+                    if len(genreName) > 0 and re.match(r'View Complete List', genreName) is None:
+                        if re.match(r'Filter content by multiple tags', genreName) is None:
+                            metadata.genres.add(genreName)
+            Log('Genre Sequence Updated')
+        except:
+            pass
 
-    # Summary.
-    try:
-      metadata.summary = ""
-      paragraph = html.xpath('//*[b[contains(text(),"Story:")]]')[0]
-      metadata.summary = paragraph.text_content().replace('&13;', '').strip(' \t\n\r"') + "\n"
-      metadata.summary.strip('\n')
-      metadata.summary = re.sub(r'Story: \n','',metadata.summary)
-      Log('Summary Sequence Updated')
-    except: pass
+        # Summary.
+        try:
+            metadata.summary = ""
+            paragraph = html.xpath('//*[b[contains(text(),"Story:")]]')[0]
+            metadata.summary = paragraph.text_content().replace('&13;', '').strip(' \t\n\r"') + "\n"
+            metadata.summary.strip('\n')
+            metadata.summary = re.sub(r'Story: \n','',metadata.summary)
+            Log('Summary Sequence Updated')
+        except:
+            pass
 
-    # Starring
-    starring = html.xpath('//*[b[contains(text(),"Starring:")]]//a[@class="bold"]')
-    metadata.roles.clear()
-    for member in starring:
-      try:
-        role = metadata.roles.new()
-        role.actor = member.text_content().strip()
-        photo = member.get('href').strip()
-        photohtml = HTML.ElementFromURL(photo)
-        role.photo = html.xpath('//a[@href="' + photo + '"]//img')[0].get('src')
-        Log('Member Photo Url : ' + role.photo)
-      except: pass
-    Log('Starring Sequence Updated')
+        # Starring
+        starring = html.xpath('//*[b[contains(text(),"Starring:")]]//a[@class="bold"]')
+        metadata.roles.clear()
+        for member in starring:
+        try:
+            role = metadata.roles.new()
+            role.actor = member.text_content().strip()
+            photo = member.get('href').strip()
+            photohtml = HTML.ElementFromURL(photo)
+            role.photo = html.xpath('//a[@href="' + photo + '"]//img')[0].get('src')
+            Log('Member Photo Url : ' + role.photo)
+        except:
+            pass
+        Log('Starring Sequence Updated')
 
-    # Studio
-    try:
-      metadata.studio = html.xpath('//a[contains(@href,"http://www.data18.com/sites/") and following-sibling::i[position()=1][text()="Network"]]')[0].text_content().strip()
-      Log('Studio Sequence Updated')
-    except: pass
+        # Studio
+        try:
+            metadata.studio = html.xpath('//a[contains(@href,"http://www.data18.com/sites/") and following-sibling::i[position()=1][text()="Network"]]')[0].text_content().strip()
+            Log('Studio Sequence Updated')
+        except:
+            pass
 
-    # Collection
-    try:
-      collection = html.xpath('//a[contains(@href,"http://www.data18.com/sites/") and following-sibling::i[position()=1][text()="Site"]]')[0].text_content().strip()
-      metadata.collections.clear ()
-      metadata.collections.add (collection)
-      Log('Collection Sequence Updated')
-    except: pass
+        # Collection
+        try:
+            collection = html.xpath('//a[contains(@href,"http://www.data18.com/sites/") and following-sibling::i[position()=1][text()="Site"]]')[0].text_content().strip()
+            metadata.collections.clear()
+            metadata.collections.add(collection)
+            Log('Collection Sequence Updated')
+        except:
+            pass
 
-   # Tagline
-    try:
-      metadata.tagline = contentURL #html.xpath('//a[@href="http://www.data18.com/sites/"]/following-sibling::a[last()]')[0].get('href')
-      Log('Tagline Sequence Updated')
-    except: pass
+        # Tagline
+        try:
+            metadata.tagline = contentURL #html.xpath('//a[@href="http://www.data18.com/sites/"]/following-sibling::a[last()]')[0].get('href')
+            Log('Tagline Sequence Updated')
+        except:
+            pass
 
-    # Content Rating
-    metadata.content_rating = 'NC-17'
+        # Content Rating
+        metadata.content_rating = 'NC-17'
 
-    Log('Updated:')
-    Log('    Title:...............' + metadata.title)
-    Log('    ID:..................' + metadata.id)
-    Log('    Release Date:........' + str(metadata.originally_available_at))
-    Log('    Year:................' + str(metadata.year))
-    Log('    TagLine:.............' + str(metadata.tagline))
-    Log('    Studio:..............' + str(metadata.studio))
+        Log('Updated:')
+        Log('    Title:...............' + metadata.title)
+        Log('    ID:..................' + metadata.id)
+        Log('    Release Date:........' + str(metadata.originally_available_at))
+        Log('    Year:................' + str(metadata.year))
+        Log('    TagLine:.............' + str(metadata.tagline))
+        Log('    Studio:..............' + str(metadata.studio))
 
-    try:
-      for key in metadata.posters.keys():
-        Log('    PosterURLs:..........' + key)
-    except: pass
-    try:
-      for key in metadata.art.keys():
-        Log('    BackgroundArtURLs:...' + key)
-    except: pass
-    try:
-      for x in range (len(metadata.collections)):
-        Log('    Network:.............' + metadata.collections[x])
-    except: pass
-    try:
-      for x in range (len(metadata.roles)):
-        Log('    Starring:............' + metadata.roles[x].actor)
-    except: pass
+        try:
+            for key in metadata.posters.keys():
+                Log('    PosterURLs:..........' + key)
+        except:
+            pass
+        try:
+            for key in metadata.art.keys():
+                Log('    BackgroundArtURLs:...' + key)
+        except:
+            pass
+        try:
+            for x in range(len(metadata.collections)):
+                Log('    Network:.............' + metadata.collections[x])
+        except:
+            pass
+        try:
+            for x in range(len(metadata.roles)):
+                Log('    Starring:............' + metadata.roles[x].actor)
+        except:
+            pass
 
-    try:
-      for x in range (len(metadata.genres)):
-        Log('    Genres:..............' + metadata.genres[x])
-    except: pass
+        try:
+            for x in range(len(metadata.genres)):
+                Log('    Genres:..............' + metadata.genres[x])
+        except:
+            pass
