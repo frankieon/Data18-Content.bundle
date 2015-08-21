@@ -12,25 +12,32 @@ EXC_MOVIE_INFO = EXC_BASEURL + 'content/%s'
 USER_AGENT = 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.2;\ Trident/4.0;\
                  SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729;\
                  .NET CLR 3.0.30729; Media Center PC 6.0)'
+
 titleFormats = r'DVD|Blu-Ray|BR|Combo|Pack'
 
 XPATHS = {
+    # Search Result Xpaths
     'scene-container': '//div[contains(@class,"bscene")]',
     'scene-link': '//span//a[contains(@href,"content")]',
     'scene-site': '//p[contains(text(), "Site")]]',
     'scene-network': '//p[contains(text(), "Network")]]',
     'scene-cast': '//p[contains(text(), "Cast")]]',
-    'release-date': '//p[text()[contains(\
-                        translate(.,"relasdt","RELASDT"),\
-                        "RELEASE DATE")]]//a',
-    'release-date2': '//*[b[contains(text(),"Scene Information")]]\
-                        //a[@title="Show me all updates from this date"]',
+
+    # Actor in site Search results
     'site-link': '//select//Option[text()[contains(\
                         translate(., "$u", "$l"), "$s")\
                         ]]//@value',
     'actor-site-link': '//a[text()[contains(\
                             translate(., "$u", "$l"), "$s")\
-                            ]]//@href'
+                            ]]//@href',
+    # Content Page Xpaths
+    'release-date': '//p[text()[contains(\
+                        translate(.,"relasdt","RELASDT"),\
+                        "RELEASE DATE")]]//a',
+    'release-date2': '//*[b[contains(text(),"Scene Information")]]\
+                        //a[@title="Show me all updates from this date"]',
+    'poster-image': '//img[@alt="poster"]',
+    'single-image-url': '//img[contains(@alt,"image")]/..'
 }
 
 
@@ -55,6 +62,65 @@ def parse_document_date(html):
     except:
         date_found = html.xpath(XPATHS['release-date2'])[0].text_content()
     return parse_content_date(date_found)
+
+
+def parse_search_results(results, search_results, media_title, year):
+    count = 0
+    title_lowercase = media_title.lower()
+    for movie in search_results.xpath(XPATHS['scene-container']):
+
+        title_link = movie.xpath(XPATHS['scene-link'])[0]
+        movie_HREF = title_link.get("href").strip()
+        Log('Movie HREF: ' + movie_HREF)
+
+        current_name = title_link.text_content().strip()
+        name_lowercase = current_name.lower()
+        Log('New title: ' + current_name + ' ' + name_lowercase)
+
+        current_ID = title_link.get('href').split('/', 4)[4]
+        Log('New ID: ' + current_ID)
+
+        name_distance_score = Util.LevenshteinDistance(title_lowercase,
+                                                       name_lowercase)
+        Log('Name Matching Distance', name_distance_score)
+
+        # Start the score
+        score = 100 - name_distance_score
+
+        try:
+            current_date = movie.xpath('/text()[1]')
+            current_date = parse_content_date(current_date)
+            Log('New Date: ' + str(current_date))
+        except:
+            try:
+                movieResults = HTML.ElementFromURL(movie_HREF)
+                current_date = parse_document_date(movieResults)
+                Log('Found Date = ' + str(current_date))
+            except (IndexError):
+                Log('Date: No date found (Exception)')
+
+        try:
+            score = score - Util.LevenshteinDistance(year, current_date.year)
+        except:
+            pass
+
+        if score >= 45:
+            if current_name.count(', The'):
+                current_name = 'The ' + current_name.replace(', The', '', 1)
+            if current_date:
+                current_name = current_name + ' [' + current_date + ']'
+
+            Log('Found:')
+            Log('    Date: ' + current_date)
+            Log('    ID: ' + current_ID)
+            Log('    Title: ' + current_name)
+            Log('    URL: ' + movie_HREF)
+            results.Append(MetadataSearchResult(id=current_ID,
+                                                name=current_name,
+                                                score=score,
+                                                lang=lang))
+        count += 1
+    return count, results
 
 
 def xpath_prepare(xpath, search):
@@ -131,231 +197,141 @@ def search_actor_in_site(results, media_title, year, lang):
 
     search_results = HTML.ElementFromURL(searchURL)
 
-
-    #searchURL = EXC_BASEURL + query_actor + '/sites/' + na_url_part + '.html'
     Log('Search URL: ' + searchURL)
-    #try:
-        #search_results = HTML.ElementFromURL(searchURL)
-    #except:
-        #searchURL = EXC_BASEURL +'dev/' + query_actor + '/sites/' + na_url_part + '.html'
-        #search_results = HTML.ElementFromURL(searchURL)
-    count = 0
-    title_lowercase = media_title.lower()
-    for movie in search_results.xpath(XPATHS['scene-container']):
 
-        title_link = movie.xpath(XPATHS['scene-link'])[0]
-        movie_HREF = title_link.get("href").strip()
-        Log('Movie HREF: ' + movie_HREF)
-
-        current_name = title_link.text_content().strip()
-        name_lowercase = current_name.lower()
-        Log('New title: ' + current_name + ' ' + name_lowercase)
-
-        current_ID = title_link.get('href').split('/', 4)[4]
-        Log('New ID: ' + current_ID)
-
-        name_distance_score = Util.LevenshteinDistance(title_lowercase,
-                                                       name_lowercase)
-        Log('Name Matching Distance', name_distance_score)
-
-        # Start the score
-        score = 100 - name_distance_score
-
-        try:
-            current_date = movie.xpath('/text()[1]')
-            current_date = parse_content_date(current_date)
-            Log('New Date: ' + str(current_date))
-        except:
-            try:
-                movieResults = HTML.ElementFromURL(movie_HREF)
-                current_date = parse_document_date(movieResults)
-                Log('Found Date = ' + str(current_date))
-            except (IndexError):
-                Log('Date: No date found (Exception)')
-
-        try:
-            score = score - Util.LevenshteinDistance(year, current_date.year)
-        except:
-            pass
-
-        if score >= 45:
-            if current_name.count(', The'):
-                current_name = 'The ' + current_name.replace(', The', '', 1)
-            if current_date:
-                current_name = current_name + ' [' + current_date + ']'
-
-            Log('Found:')
-            Log('    Date: ' + current_date)
-            Log('    ID: ' + current_ID)
-            Log('    Title: ' + current_name)
-            Log('    URL: ' + movie_HREF)
-            result = MetadataSearchResult(id=current_ID, name=current_name, score=score, lang=lang)
-            results.Append(result)
-        count += 1
+    count, newResults = parse_search_results(results,
+                                             search_results,
+                                             media_title,
+                                             year)
     results.Sort('score', descending=True)
 
 
 class EXCAgent(Agent.Movies):
-  name = 'Data18-Content'
-  languages = [Locale.Language.English]
-  accepts_from = ['com.plexapp.agents.localmedia']
-  primary_provider = True
+    name = 'Data18-Content'
+    languages = [Locale.Language.English]
+    accepts_from = ['com.plexapp.agents.localmedia']
+    primary_provider = True
 
+    def search(self, results, media, lang):
+        Log('Data18 Version : ' + VERSION_NO)
+        Log('**************SEARCH****************')
+        title = media.name
+        content_id = False
 
-  def search(self, results, media, lang):
-    Log('Data18 Version : ' + VERSION_NO)
-    Log('**************SEARCH****************')
-    title = media.name
-    content_id = False
+        if media.name.isdigit():
+            Log('Media.name is numeric')
+            content_id = True
+            contentURL = EXC_MOVIE_INFO % media.name
+            html = HTML.ElementFromURL(contentURL)
+            title = html.xpath('//div/h1/text()')[0]
+            results.Append(MetadataSearchResult(id=media.name,
+                                                name=title,
+                                                score='100',
+                                                lang=lang))
 
-    if media.name.isdigit():
-        Log('Media.name is numeric')
-        content_id = True
-        contentURL = EXC_MOVIE_INFO % media.name
+        if media.primary_metadata is not None:
+            title = media.primary_metadata.title
+
+        year = media.year
+        if media.primary_metadata is not None:
+            year = media.primary_metadata.year
+            Log('Searching for Year: ' + year)
+
+        Log('Searching for Title: ' + title)
+
+        if len(results) == 0:
+            query = String.URLEncode(String.StripDiacritics(title))
+
+            searchUrl = EXC_SEARCH_MOVIES % query
+            Log('search url: ' + searchUrl)
+            searchResults = HTML.ElementFromURL(searchUrl)
+            searchTitle = searchResults.xpath('//title')[0].text_content()
+            count, newResults = parse_search_results(results,
+                                                     searchResults,
+                                                     title,
+                                                     year)
+
+        if " in " in title.lower() and not content_id:
+            try:
+                search_actor_in_site(results, title, year, lang)
+            except (IndexError):
+                pass
+
+        results.Sort('score', descending=True)
+
+    def update(self, metadata, media, lang):
+        Log('Data18 Version : ' + VERSION_NO)
+        Log('**************UPDATE****************')
+        contentURL = EXC_MOVIE_INFO % metadata.id
         html = HTML.ElementFromURL(contentURL)
-        title = html.xpath('//div/h1/text()')[0]
-        results.Append(MetadataSearchResult(id = media.name, name  = title, score = '100', lang = lang))
+        metadata.title = re.sub(titleFormats, '', media.title).strip(' .-+')
 
-    if media.primary_metadata is not None:
-      title = media.primary_metadata.title
+        Log('Current:')
+        Log('    Title: ' + metadata.title)
+        Log('    ID: ' + metadata.id)
+        Log('    Release Date: ' + str(metadata.originally_available_at))
+        Log('    Year: ' + str(metadata.year))
+        Log('    URL: ' + contentURL)
+        for key in metadata.posters.keys():
+            Log('    PosterURLs: ' + key)
 
-    year = media.year
-    if media.primary_metadata is not None:
-      year = media.primary_metadata.year
-      Log('Searching for Year: ' + year)
-
-    Log('Searching for Title: ' + title)
-
-    if len(results) == 0:
-      #query = String.URLEncode(String.StripDiacritics(title.replace('-','')))
-      query = String.URLEncode(String.StripDiacritics(title))
-
-      searchUrl = EXC_SEARCH_MOVIES % query
-      Log('search url: ' + searchUrl)
-      searchResults = HTML.ElementFromURL(searchUrl)
-      searchTitle = searchResults.xpath('//title')[0].text_content()
-      count = 0
-      for movie in searchResults.xpath(XP_SCENE_LINK):
-        movieHREF = movie.get("href").strip()
-        Log('MovieHREF: ' + movieHREF)
-        curName = movie.text_content().strip()
-        Log('newTitle: ' + curName)
-        curID = movie.get('href').split('/',4)[4]
-        Log('newID: ' + curID)
+        # Release Date
         try:
-          movieResults = HTML.ElementFromURL(movieHREF)
-          curdate = parse_document_date(movieResults)
-          if curdate is None:
-            Log('Date: No date found')
-            score = 100 - Util.LevenshteinDistance(title.lower(), curName.lower())
-            curyear = ''
-            curdate = ''
-          else:
-            curyear = str(curdate.year)
-            curmonth = str(curdate.month)
-            curday = str(curdate.day)
+            curdate = parse_document_date(html)
+            metadata.originally_available_at = curdate
             curdate = str(curdate)
-            Log('Found Date = ' + curdate)
-            score = 100 - Util.LevenshteinDistance(title.lower(), curName.lower()) - Util.LevenshteinDistance(year, curyear)
-            Log('It Worked ************************************************************')
-        except (IndexError):
-          score = 100 - Util.LevenshteinDistance(title.lower(), curName.lower())
-          curyear = ''
-          curdate = ''
-          Log('Date: No date found (Exception)')
-        if score >= 45:
-          if curName.count(', The'):
-            curName = 'The ' + curName.replace(', The','',1)
-          if curdate:
-            curName = curName + ' [' + curdate + ']'
+            metadata.year = metadata.originally_available_at.year
 
-          #Log('Found:')
-          #Log('    Date: ' + curdate)
-          #Log('    ID: ' + curID)
-          #Log('    Title: ' + curName)
-          #Log('    URL: ' + movieHREF)
-          results.Append(MetadataSearchResult(id = curID, name = curName, score = score, lang = lang))
-        count += 1
+            # Commenting for now as this replaces the search title with no
+            # date, which is helpful
+            #metadata.title = re.sub(r'\[\d+-\d+-\d+\]', '',\
+            #                               metadata.title).strip(' ')
+            #Log('Title Updated')
+            Log('Release Date Sequence Updated')
+        except:
+            pass
 
-      if " in " in title.lower() and not content_id:
+        # Get Poster
+        # Get Official Poster if available
+        i = 1
+
         try:
-          search_actor_in_site(results, title, year, lang)
-        except (IndexError):
-          pass
+            posterimg = html.xpath(XPATHS['poster-image'])[0]
+            posterUrl = posterimg.get('src').strip()
+            Log('Official posterUrl: ' + posterUrl)
+            posterRequest = HTTP.Request(posterUrl,
+                                         headers={'Referer': contentURL})
+            metadata.posters[posterUrl] = Proxy.Media(posterRequest.content,
+                                                      sort_order=i)
+            i += 1
+            Log('Poster Sequence Updated')
+        except:
+            pass
 
-      results.Sort('score', descending=True)
+        # Get First Photo Set Pic if available
+        try:
+            photoSetIndex = 0
+            imageURL =  html.xpath(XPATHS['single-image-url'])[photoSetIndex]
+            imageURL = imageURL.get('href')
 
+            imagehtml = HTML.ElementFromURL(imageURL)
 
-
-
-
-  def update(self, metadata, media, lang):
-    Log('Data18 Version : ' + VERSION_NO)
-    Log('**************UPDATE****************')
-    contentURL = EXC_MOVIE_INFO % metadata.id
-    html = HTML.ElementFromURL(contentURL)
-    metadata.title = re.sub(titleFormats,'',media.title).strip(' .-+')
-
-    Log('Current:')
-    Log('    Title: ' + metadata.title)
-    Log('    ID: ' + metadata.id)
-    Log('    Release Date: ' + str(metadata.originally_available_at))
-    Log('    Year: ' + str(metadata.year))
-    Log('    URL: ' + contentURL)
-    for key in metadata.posters.keys():
-      Log('    PosterURLs: ' + key)
-
-    # Release Date
-    try:
-      curdate = parse_document_date(html)
-      metadata.originally_available_at = curdate
-      curyear = str(curdate.year)
-      curmonth = str(curdate.month)
-      curday = str(curdate.day)
-      curdate = str(curdate)
-      metadata.year = metadata.originally_available_at.year
-
-      # Commenting for now as this replaces the search title with no date, which is helpful
-      #metadata.title = re.sub(r'\[\d+-\d+-\d+\]','',metadata.title).strip(' ')
-
-      Log('Title Updated')
-      Log('Release Date Sequence Updated')
-    except: pass
-
-    # Get Poster
-    # Get Official Poster if available
-    i = 1
-
-    try:
-      posterimg = html.xpath('//img[@alt="poster"]')[0]
-      posterUrl = posterimg.get('src').strip()
-      Log('Official posterUrl: ' + posterUrl)
-      metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': contentURL}).content, sort_order = i)
-      i += 1
-      Log('Poster Sequence Updated')
-    except: pass
-
-    # Get First Photo Set Pic if available
-    try:
-      photoSetIndex = 0
-      imageURL =  html.xpath('//img[contains(@alt,"image")]/..')[photoSetIndex].get('href')
-      imagehtml = HTML.ElementFromURL(imageURL)
-      posterimg = imagehtml.xpath('//img[@alt= "image"]')[0]
-      posterUrl = posterimg.get('src').strip()
-      Log('imageUrl: ' + posterUrl)
-      metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
-      i += 1
-      #Random PhotoSet image incase first image isn't desired
-      photoSetIndex = random.randint(1,len(html.xpath('//img[contains(@alt,"image")]/..'))-1)
-      imageURL =  html.xpath('//img[contains(@alt,"image")]/..')[photoSetIndex].get('href')
-      imagehtml = HTML.ElementFromURL(imageURL)
-      posterimg = imagehtml.xpath('//img[@alt= "image"]')[0]
-      posterUrl = posterimg.get('src').strip()
-      Log('imageUrl: ' + posterUrl)
-      metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
-      i += 1
-      Log('Poster - Photoset - Sequence Updated')
-    except: pass
+            posterimg = imagehtml.xpath('//img[@alt= "image"]')[0]
+            posterUrl = posterimg.get('src').strip()
+            Log('imageUrl: ' + posterUrl)
+            metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
+            i += 1
+            #Random PhotoSet image incase first image isn't desired
+            photoSetIndex = random.randint(1,len(html.xpath('//img[contains(@alt,"image")]/..'))-1)
+            imageURL =  html.xpath('//img[contains(@alt,"image")]/..')[photoSetIndex].get('href')
+            imagehtml = HTML.ElementFromURL(imageURL)
+            posterimg = imagehtml.xpath('//img[@alt= "image"]')[0]
+            posterUrl = posterimg.get('src').strip()
+            Log('imageUrl: ' + posterUrl)
+            metadata.posters[posterUrl] = Proxy.Media(HTTP.Request(posterUrl, headers={'Referer': imageURL}).content, sort_order = i)
+            i += 1
+            Log('Poster - Photoset - Sequence Updated')
+        except: pass
 
     # Get First Photo Set Pic if available (when src is used instead of href)
     try:
